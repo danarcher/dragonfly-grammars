@@ -349,6 +349,7 @@ grammarCfg.cmd.map = Item(
         "[press] (hyper|windows) first": Key("win:down/3, 1/3, win:up/3"),
         "[press] (hyper|windows) <m>": Key("win:down/3, %(m)d/3, win:up/3"),
         "release [all]": release,
+        "git commit minus M": Text("git commit -m "),
         # Closures.
         "angle brackets": Key("langle, rangle, left/3"),
         "brackets": Key("lbracket, rbracket, left/3"),
