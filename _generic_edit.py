@@ -44,7 +44,7 @@ from lib.format import (
     FormatTypes as ft,
 )
 
-release = Key("shift:up, ctrl:up, alt:up")
+release = Key("shift:up, ctrl:up, alt:up, win:up")
 
 ################################################################################
 ## Disabling dictation mode
@@ -124,125 +124,6 @@ def paste_command():
     Key("c-v/3").execute()
 
 ################################################################################
-
-# For repeating of characters.
-specialCharMap = {
-    "(bar|vertical bar|pipe)": "|",
-    "(dash|minus|hyphen)": "-",
-    "(dot|period)": ".",
-    "comma": ",",
-    "backslash": "\\",
-    "underscore": "_",
-    "(star|asterisk)": "*",
-    "colon": ":",
-    "(semicolon|semi-colon)": ";",
-    "at": "@",
-    "[double] quote": '"',
-    "single quote": "'",
-    "hash": "#",
-    "dollar": "$",
-    "percent": "%",
-    "and": "&",
-    "slash": "/",
-    "equal": "=",
-    "plus": "+",
-    "space": " "
-}
-
-# Modifiers for the press-command.
-modifierMap = {
-    "alt": "a",
-    "control": "c",
-    "shift": "s",
-    "super": "w",
-}
-
-# Modifiers for the press-command, if only the modifier is pressed.
-singleModifierMap = {
-    "alt": "alt",
-    "control": "ctrl",
-    "shift": "shift",
-    "super": "win",
-}
-
-letterMap = {
-    "(A|alpha)": "a",
-    "(B|bravo) ": "b",
-    "(C|charlie) ": "c",
-    "(D|delta) ": "d",
-    "(E|echo) ": "e",
-    "(F|foxtrot) ": "f",
-    "(G|golf) ": "g",
-    "(H|hotel) ": "h",
-    "(I|india|indigo) ": "i",
-    "(J|juliet) ": "j",
-    "(K|kilo) ": "k",
-    "(L|lima) ": "l",
-    "(M|mike) ": "m",
-    "(N|november) ": "n",
-    "(O|oscar) ": "o",
-    "(P|papa|poppa) ": "p",
-    "(Q|quebec|quiche) ": "q",
-    "(R|romeo) ": "r",
-    "(S|sierra) ": "s",
-    "(T|tango) ": "t",
-    "(U|uniform) ": "u",
-    "(V|victor) ": "v",
-    "(W|whiskey) ": "w",
-    "(X|x-ray) ": "x",
-    "(Y|yankee) ": "y",
-    "(Z|zulu) ": "z",
-}
-
-numberMap = {
-    "zero": "0",
-    "one": "1",
-    "two": "2",
-    "three": "3",
-    "four": "4",
-    "five": "5",
-    "six": "6",
-    "seven": "7",
-    "eight": "8",
-    "nine": "9",
-}
-
-controlKeyMap = {
-    "left": "left",
-    "right": "right",
-    "up": "up",
-    "down": "down",
-    "page up": "pgup",
-    "page down": "pgdown",
-    "home": "home",
-    "end": "end",
-    "space": "space",
-    "(enter|return)": "enter",
-    "escape": "escape",
-    "tab": "tab"
-}
-
-# F1 to F12.
-functionKeyMap = {
-    'F one': 'f1',
-    'F two': 'f2',
-    'F three': 'f3',
-    'F four': 'f4',
-    'F five': 'f5',
-    'F six': 'f6',
-    'F seven': 'f7',
-    'F eight': 'f8',
-    'F nine': 'f9',
-    'F ten': 'f10',
-    'F eleven': 'f11',
-    'F twelve': 'f12',
-}
-
-pressKeyMap = {}
-pressKeyMap.update(letterMap)
-pressKeyMap.update(numberMap)
-pressKeyMap.update(controlKeyMap)
-pressKeyMap.update(functionKeyMap)
 
 formatMap = {
     "camel": ft.camelCase,
@@ -419,6 +300,26 @@ grammarCfg.cmd.map = Item(
         "doc save": Key("c-s"),
         "doc open": Key("c-o"),
         "doc save as": Key("alt:down/3,f/3,a/3,alt:up/3"),
+        "doc close [<n>]": Key("c-w:%(n)d"),
+        "doc close all": Key("cs-w:%(n)d"),
+        "doc next [<n>]": Key("c-tab:%(n)d"),
+        "doc create [<n>]": Key("c-n:%(n)d"),
+        "doc new tab": Key("c-t"),
+        "doc (previous|back) [<n>]": Key("cs-tab:%(n)d"),
+        "doc (search|find)": Key("c-f"),
+        "doc print": Key("c-p"),
+        "select line [<n>]": release + Key("home, home, s-down:%(n)d"),
+        "uno [<n>]": Key("f1:%(n)d"),
+        "doss [<n>]": Key("f2:%(n)d"),
+        "trez [<n>]": Key("f3:%(n)d"),
+        "quatro [<n>]": Key("f4:%(n)d"),
+        "sinko [<n>]": Key("f5:%(n)d"),
+        "see ettay [<n>]": Key("f7:%(n)d"),
+        "occo [<n>]": Key("f8:%(n)d"),
+        "noo evvay [<n>]": Key("f9:%(n)d"),
+        "dee ez [<n>]": Key("f10:%(n)d"),
+        "onsay [<n>]": Key("f11:%(n)d"),
+        "dossay [<n>]": Key("f12:%(n)d"),
         # Functional keys.
         "space": release + Key("space"),
         "space [<n>]": release + Key("space:%(n)d"),
@@ -437,12 +338,16 @@ grammarCfg.cmd.map = Item(
         "undo <n> [times]": release + Key("c-z/3:%(n)d"),
         "redo": release + Key("c-y/3"),
         "redo <n> [times]": release + Key("c-y/3:%(n)d"),
-        "[(hold|press)] alt": Key("alt:down/3"),
-        "release alt": Key("alt:up"),
+        "[(hold|press)] (alt|meta)": Key("alt:down/3"),
+        "release (alt|meta)": Key("alt:up"),
         "[(hold|press)] shift": Key("shift:down/3"),
         "release shift": Key("shift:up"),
         "[(hold|press)] control": Key("ctrl:down/3"),
         "release control": Key("ctrl:up"),
+        "(hold|press) (hyper|windows)": Key("win:down/3"),
+        "release (hyper|windows)": Key("win:up"),
+        "[press] (hyper|windows) first": Key("win:down/3, 1/3, win:up/3"),
+        "[press] (hyper|windows) <m>": Key("win:down/3, %(m)d/3, win:up/3"),
         "release [all]": release,
         # Closures.
         "angle brackets": Key("langle, rangle, left/3"),
@@ -548,12 +453,14 @@ grammarCfg.cmd.map = Item(
         "rang": Text(">"),
         "pipe": Text("|"),
         "eke": Text("="),
+        "plus": Text("+"),
+        "minus": Text("-"),
         "(underscore|bar) [<n>]": Key("underscore/2:%(n)d"),
         "(sem|semi|rock|semicolon)": Text(";"),
         "(coal|colon)": Text(":"),
         "(comma|cam) [<n>]": Key("comma/2:%(n)d"),
         "(dot|period) [<n>]": Key("dot/2:%(n)d"),
-        "(dash|hyphen|minus) [<n>]": Key("hyphen/2:%(n)d"),
+        "(dash|hyphen) [<n>]": Key("hyphen/2:%(n)d"),
         "hash [<n>]": Key("hash/2:%(n)d"),
         #"": Text(""),
         # Ego
@@ -587,19 +494,16 @@ class KeystrokeRule(MappingRule):
     mapping = grammarCfg.cmd.map
     extras = [
         IntegerRef("n", 1, 100),
+        IntegerRef("m", 0, 100),
         Dictation("text"),
         Dictation("text2"),
-        Choice("char", specialCharMap),
-        Choice("modifier1", modifierMap),
-        Choice("modifier2", modifierMap),
-        Choice("modifierSingle", singleModifierMap),
-        Choice("pressKey", pressKeyMap),
         Choice("formatType", formatMap),
         Choice("abbreviation", abbreviationMap),
         Choice("reservedWord", reservedWord),
     ]
     defaults = {
         "n": 1,
+        "m": 0,
     }
 
 alternatives = []
