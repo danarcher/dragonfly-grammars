@@ -6,6 +6,7 @@ http://dragonfly-modules.googlecode.com/svn/trunk/command-modules/documentation/
 Licensed under the LGPL, see http://www.gnu.org/licenses/
 
 """
+from time import sleep
 from natlink import setMicState
 from dragonfly import (
     Alternative, AppContext,
@@ -15,6 +16,7 @@ from dragonfly import (
     MappingRule, Mimic, Mouse,
     Pause, Repetition, RuleRef,
     Section, Text, Window,
+    get_engine
 )
 
 import win32con
@@ -91,8 +93,8 @@ def dictation_on():
 
 def cancel_and_sleep(text=None, text2=None):
     """random mumbling go to sleep'" => Microphone sleep."""
-    print("* Dictation canceled. Going to sleep. *")
-    sound.play(sound.SND_DING)
+    #print("* Dictation canceled. Going to sleep. *")
+    #sound.play(sound.SND_DING)
     setMicState("sleeping")
 
 def reload_natlink():
@@ -293,7 +295,7 @@ grammarCfg.cmd.map = Item(
         "down <n> (page|pages)": Key("pgdown:%(n)d"),
         "left <n> (word|words)": Key("c-left/3:%(n)d/10"),
         "right <n> (word|words)": Key("c-right/3:%(n)d/10"),
-        "home": Key("home"),
+        "home|homer": Key("home"),
         "end": Key("end"),
         "doc home": Key("c-home/3"),
         "doc end": Key("c-end/3"),
@@ -303,12 +305,17 @@ grammarCfg.cmd.map = Item(
         "doc close [<n>]": Key("c-w:%(n)d"),
         "doc close all": Key("cs-w:%(n)d"),
         "doc next [<n>]": Key("c-tab:%(n)d"),
-        "doc create [<n>]": Key("c-n:%(n)d"),
+        "doc create": Key("c-n"),
         "doc new tab": Key("c-t"),
         "doc (previous|back) [<n>]": Key("cs-tab:%(n)d"),
         "doc (search|find)": Key("c-f"),
         "doc print": Key("c-p"),
+        "doc format": Key("a-e, v, a"),
         "select line [<n>]": release + Key("home, home, s-down:%(n)d"),
+        "go block start [<n>]": Key("sa-[:%(n)d"),
+        "show parameters": Key("cs-space"),
+        "integer": Text("int"),
+        "variable": Text("var"),
         "uno [<n>]": Key("f1:%(n)d"),
         "doss [<n>]": Key("f2:%(n)d"),
         "trez [<n>]": Key("f3:%(n)d"),
@@ -323,10 +330,10 @@ grammarCfg.cmd.map = Item(
         # Functional keys.
         "space": release + Key("space"),
         "space [<n>]": release + Key("space:%(n)d"),
-        "slap [<n>]": release + Key("enter:%(n)d"),
+        "(slap|go) [<n>]": release + Key("enter:%(n)d"),
         "tab [<n>]": Key("tab:%(n)d"),
         "delete [<n>]": Key("del/3:%(n)d"),
-        "delete [this] line": Key("home, s-end, del"),  # @IgnorePep8
+        "delete [this] line": Key("home, home, s-end, del, del"),  # @IgnorePep8
         "backspace [<n>]": release + Key("backspace:%(n)d"),
         "application key": release + Key("apps/3"),
         "win key": release + Key("win/3"),
@@ -454,8 +461,10 @@ grammarCfg.cmd.map = Item(
         "rang": Text(">"),
         "pipe": Text("|"),
         "eke": Text("="),
+        "bang": Text("!"),
         "plus": Text("+"),
         "minus": Text("-"),
+        "mull": Text("*"),
         "(underscore|bar) [<n>]": Key("underscore/2:%(n)d"),
         "(sem|semi|rock|semicolon)": Text(";"),
         "(coal|colon)": Text(":"),
@@ -468,6 +477,7 @@ grammarCfg.cmd.map = Item(
         "quit [<n>]": release + Key("escape:%(n)d"),
         "switch [<n>]": release + Key("alt:down/10, tab:%(n)d/10, alt:up"),
         "hut": release + Key("alt:down/5, d, alt:up"),
+        "context menu": release + Key("apps"),
         # Ego
         "hash include stud Io": Text("#include <stdio.h>"),
         "hash include stud lib": Text("#include <stdlib.h>"),
@@ -483,6 +493,9 @@ grammarCfg.cmd.map = Item(
         "dictation on": Function(dictation_on),
         "dictation off": Function(dictation_off),
         "say <text>": Text("%(text)s"),
+        # Ego
+        "show dragon tip": Text(""),
+        "move dragon tip": Mouse("[15, 8]/200, left:down, [0.66, 0.98], left:up, <-50,0>"),
     },
     namespace={
         "Key": Key,
@@ -547,6 +560,9 @@ def unload():
 
 ################################################################################
 
+elite_mode = "flight"
+elite_driving_speed = 0
+
 def elite_key(n=1, name=None):
     k = Key("{}:down/5, {}:up/10".format(name, name))
     for i in range(n):
@@ -570,24 +586,127 @@ def elite_timed_key_pair(n=1, name=None, factor=12, second=None):
     k = Key("{}:down/5, {}:down/{}, {}:up/10, {}:up/10".format(name, second, 5+n*factor, second, name))
     k.execute()
 
-elite_galaxy_release = Key("w:up, a:up, s:up, r:up, f:up, d:up/10")
+def elite_switch_mode(name):
+    global elite_mode
+    elite_mode = name
+    get_engine().speak(name + " mode")
+
+def elite_galaxy_map():
+    elite_longer_key(pre="f1", name="u")
+
+def elite_next_tab():
+    elite_longer_key(pre="f2", name="i")
+
+def elite_select():
+    elite_key(name="b")
+
+def elite_galaxy_route():
+    elite_galaxy_map()
+    sleep(2)
+    elite_next_tab()
+    sleep(0.1)
+    elite_select()
+
+def elite_galaxy_bookmarks():
+    elite_galaxy_map()
+    sleep(2)
+    elite_next_tab()
+    elite_next_tab()
+
+def elite_navigate(name=None, n=1):
+    global elite_mode
+    if name == "left":
+        if elite_mode == "flight":
+            Function(elite_key, name="left", n=n).execute()
+        elif elite_mode == "driving":
+            Function(elite_timed_key, name="a", factor=6, n=n).execute()
+    elif name == "right":
+        if elite_mode == "flight":
+            Function(elite_key, name="right", n=n).execute()
+        elif elite_mode == "driving":
+            Function(elite_timed_key, name="d", factor=6, n=n).execute()
+
+def elite_relative_speed(name=None, n=1):
+    global elite_mode
+    global elite_driving_speed
+    if name == "faster":
+        if elite_mode == "flight":
+            Function(elite_long_key, pre="f5", name="q").execute()
+        elif elite_mode == "driving":
+            for i in range(n):
+                elite_driving_speed = elite_driving_speed + 1
+                Key("e:down/5, e:up/10").execute()
+
+    elif name == "slower":
+        if elite_mode == "flight":
+            Function(elite_long_key, pre="f5", name="w").execute()
+        elif elite_mode == "driving":
+            for i in range(n):
+                elite_driving_speed = elite_driving_speed - 1
+                Key("q:down/5, q:up/10").execute()
+
+def elite_all_stop():
+    global elite_mode
+    global elite_driving_speed
+    if elite_mode == "flight":
+        Function(elite_long_key, pre="f5", name="u").execute()
+    elif elite_mode == "driving":
+        while elite_driving_speed > 0:
+            elite_driving_speed = elite_driving_speed - 1
+            Key("q:down/5, q:up/10").execute()
+        while elite_driving_speed < 0:
+            elite_driving_speed = elite_driving_speed + 1
+            Key("e:down/5, e:up/10").execute()
+
+def elite_what_driving_speed():
+    get_engine().speak("driving speed is {}".format(elite_driving_speed))
+
+def elite_reset_driving_speed():
+    global elite_driving_speed
+    elite_driving_speed = 0
+    get_engine().speak("driving speed is now {}".format(elite_driving_speed))
+
+def elite_target(name):
+    global elite_mode
+    global elite_driving_speed
+    if name == "ahead":
+        if elite_mode == "flight":
+            Function(elite_long_key, pre="f7", name="w").execute()
+        elif elite_mode == "driving":
+            Mouse("right:down/5, right:up/10").execute()
+
+def elite_what_mode():
+    global elite_mode
+    get_engine().speak(elite_mode + " mode")
+
+elite_galaxy_release = Key("w:up, a:up, s:up, r:up, x:up, z:up, f:up, d:up/10")
 
 class EliteRule(MappingRule):
     mapping = {
+        # Modes
+        "driving mode": Function(elite_switch_mode, name="driving"),
+        "(flight|normal) mode": Function(elite_switch_mode, name="flight"),
+        "reset driving speed": Function(elite_reset_driving_speed),
+        "what mode": Function(elite_what_mode),
+        "what driving speed": Function(elite_what_driving_speed),
+
+        # Mouse controls
+        "reset mouse": Function(elite_long_key, pre="9", name="q"),
+
         # Flight rotation
-        "sky <n>": Function(elite_timed_key, name="np8"),
-        "sea <n>": Function(elite_timed_key, name="np2"),
-        "loll <n>": Function(elite_timed_key, name="np4"),
-        "roll <n>": Function(elite_timed_key, name="np6"),
-        "port <n>": Function(elite_timed_key, name="np7"),
-        "starboard <n>": Function(elite_timed_key, name="np9"),
-        "sky": Key("np2:up/10, np8:down/5"),
-        "sea": Key("np8:up/10, np2:down/5"),
+        "sky <n>": Function(elite_timed_key, name="b"),
+        "sea <n>": Function(elite_timed_key, name="np5"),
+        "loll <n>": Function(elite_timed_key, name="np4", factor=3),
+        "roll <n>": Function(elite_timed_key, name="np6", factor=3),
+        "port <n>": Function(elite_timed_key, name="a"),
+        "starboard <n>": Function(elite_timed_key, name="c"),
+        "sky": Key("np5:up/10, b:down/5"),
+        "sea": Key("b:up/10, np5:down/5"),
         "loll": Key("np6:up/10, np4:down/5"),
         "roll": Key("np4:up/10, np6:down/5"),
-        "port": Key("np9:up/10, np7:down/5"),
-        "starboard": Key("np7:up/10, np9:down/5"),
-        "lock": Key("np4, np6, np2, np8, np7, np9, np4:up/10, np6:up/10, np2:up/10, np8:up/10, np7:up/10, np9:up/10"),
+        "port": Key("c:up/10, a:down/5"),
+        "starboard": Key("a:up/10, c:down/5"),
+        "lock": Key("np4, np5, np6, np7, np8, np9, a, b, c, np4:up, np5:up, np6:up, np7:up, np8:up, np9:up, a:up, b:up, c:up/10"),
 
         # Flight thrust
         "thrust up": Key("f:up/10, r:down/5"),
@@ -605,27 +724,27 @@ class EliteRule(MappingRule):
         "thrust (back|backward) <n>": Function(elite_timed_key, name="npdec"),
 
         # Flight throttle
-        "faster": Function(elite_long_key, pre="f5", name="q"),
-        "slower": Function(elite_long_key, pre="f5", name="w"),
+        "faster [<n>]": Function(elite_relative_speed, name="faster"),
+        "slower [<n>]": Function(elite_relative_speed, name="slower"),
         "full reverse": Function(elite_long_key, pre="f5", name="e"),
         "three quarter reverse": Function(elite_long_key, pre="f5", name="r"),
         "half reverse": Function(elite_long_key, pre="f5", name="t"),
         "quarter reverse": Function(elite_long_key, pre="f5", name="y"),
-        "all stop": Function(elite_long_key, pre="f5", name="u"),
+        "all stop": Function(elite_all_stop),
         "quarter impulse": Function(elite_long_key, pre="f5", name="i"),
         "half impulse": Function(elite_long_key, pre="f5", name="o"),
         "(three quarter impulse|cruising speed)": Function(elite_long_key, pre="f5", name="p"),
-        "(full impulse|engage)": Function(elite_long_key, pre="f5", name="a"),
+        "(full impulse|engage|[all] ahead full)": Function(elite_long_key, pre="f5", name="a"),
 
         # Flight miscellaneous
         "boost [engines]": Function(elite_long_key, pre="f6", name="w"),
-        "charge the hyperdrive": Function(elite_long_key, pre="f6", name="e"),
-        "supercruise": Function(elite_long_key, pre="f6", name="r"),
-        "hyperspace": Function(elite_long_key, pre="f6", name="t"),
+        "[charge the] hyperdrive": Function(elite_long_key, pre="f6", name="e"),
+        "(supercruise|cruise)": Function(elite_long_key, pre="f6", name="r"),
+        "(hyperspace|jump)": Function(elite_long_key, pre="f6", name="t"),
         "toggle orbit lines": Function(elite_long_key, pre="f6", name="y"),
 
         # Targeting
-        "target ahead": Function(elite_long_key, pre="f7", name="q"),
+        "target ahead": Function(elite_target, name="ahead"),
         "[target] next (target|ship) [<n>]": Function(elite_long_key, pre="f7", name="w"),
         "[target] previous (target|ship) [<n>]": Function(elite_long_key, pre="f7", name="e"),
         "[target] highest (threat|ship) [<n>]": Function(elite_long_key, pre="f7", name="r"),
@@ -643,10 +762,13 @@ class EliteRule(MappingRule):
         # Weapons
         "fire 1": Mouse("left:down/5"),
         "fire 2": Mouse("right:down/5"),
-        "(cease fire|stop firing|stop shooting)": Mouse("left:up/10, right:up/10"),
+        "fire 3": Mouse("middle:down/5"),
+        "commence honking": Mouse("left:down/550, left:up/10"),
+        "(cease fire|stop firing|stop shooting)": Mouse("left:up, middle:up, right:up/10"),
         "fox 1": Mouse("left:down/5, left:up/10"),
         "fox 2": Mouse("right:down/5, right:up/10"),
-        "(next fire group|next weapon) [<n>]": Function(elite_long_key, pre="f8", name="e"),
+        "fox 3": Mouse("middle:down/5, middle:up/10"),
+        "(next fire group|next weapon|weapon) [<n>]": Function(elite_long_key, pre="f8", name="e"),
         "(previous fire group|previous weapon) [<n>]": Function(elite_long_key, pre="f8", name="r"),
         "(deploy|retract|stow) (hardpoints|weapons)": Function(elite_long_key, pre="f8", name="t"),
 
@@ -675,33 +797,42 @@ class EliteRule(MappingRule):
         "night vision": Function(elite_long_key, pre="f11", name="k"),
 
         # Mode switches
-        "(left panel|target panel)": Function(elite_key, name="1"),
-        "(right panel|systems)": Function(elite_key, name="4"),
+        "(left panel|target panel|Nav)": Function(elite_key, name="1"),
+        "(right panel|systems|inventory|ship)": Function(elite_key, name="4"),
         "(top panel|comms)": Function(elite_key, name="2"),
         "(bottom panel|role panel)": Function(elite_key, name="3"),
-        "galaxy map": Function(elite_longer_key, pre="f1", name="u"),
+        "galaxy map": Function(elite_galaxy_map),
+        "galaxy route": Function(elite_galaxy_route),
+        "galaxy (bookmarks|bookmark)": Function(elite_galaxy_bookmarks),
         "system map": Function(elite_longer_key, pre="f1", name="i"),
         "show CQC score screen": Function(elite_longer_key, pre="f1", name="o"),
         "headlook": Function(elite_longer_key, pre="f1", name="p"),
         "game menu": Function(elite_longer_key, pre="f1", name="a"),
         "open discovery": Function(elite_longer_key, pre="f1", name="d"),
-        "[switch] (hud|hut|hudd|weapon) mode": Function(elite_longer_key, pre="f1", name="f"),
+        "[switch|change] [hud|hut|hudd|weapon] mode": Function(elite_longer_key, pre="f1", name="f"),
         "request docking": Key("1:down/5, 1:up/50, e:down/5, e:up/50, e:down/5, e:up/50, right:down/5, right:up/50, space:down/5, space:up/50, left:down/5, left:up/50, q:down/5, q:up/50, q:down/5, q:up/50, backspace:down/5, backspace:up/50"),
 
         # Interface mode
         "up [<n>]": Function(elite_key, name="up"),
         "down [<n>]": Function(elite_key, name="down"),
-        "right [<n>]": Function(elite_key, name="right"),
-        "left [<n>]": Function(elite_key, name="left"),
+        "right [<n>]": Function(elite_navigate, name="right"),
+        "left [<n>]": Function(elite_navigate, name="left"),
         "slap [<n>]": Function(elite_key, name="enter"),
         "quit [<n>]": Function(elite_key, name="escape"),
-        "(space|go|select) [<n>]": Function(elite_key, name="space"),
+        "(space|go|select|make it so) [<n>]": Function(elite_select),
         "back [<n>]": Function(elite_key, name="backspace"),
         "expand|collapse": Function(elite_longer_key, pre="f2", name="u"),
-        "[next] tab [<n>]": Function(elite_longer_key, pre="f2", name="i"),
-        "(previous|shift) tab [<n>]": Function(elite_longer_key, pre="f2", name="h"),
+        "[next] tab [<n>]": Function(elite_next_tab),
+        "(previous tab|shift tab|bat) [<n>]": Function(elite_longer_key, pre="f2", name="h"),
         "next page [<n>]": Function(elite_longer_key, pre="f2", name="j"),
         "previous page [<n>]": Function(elite_longer_key, pre="f2", name="k"),
+
+        "(meta down|alt key down)": Key("alt:down/5"),
+        "(meta up|alt key up)": Key("alt:up/10"),
+        "shift key down": Key("alt:down/5"),
+        "shift key up": Key("shift:up/10"),
+        "control key down": Key("ctrl:down/5"),
+        "control key up": Key("ctrl:up/10"),
 
         # Headlook mode
 
@@ -729,6 +860,45 @@ class EliteRule(MappingRule):
         "walk down <n>": Function(elite_timed_key, name="f", factor=6),
         "walk up": elite_galaxy_release + Key("r:down/5"),
         "walk down": elite_galaxy_release + Key("f:down/5"),
+        "zoom out <n>": Function(elite_timed_key, name="x", factor=6),
+        "zoom in <n>": Function(elite_timed_key, name="z", factor=6),
+        "zoom out": elite_galaxy_release + Key("x:down/5"),
+        "zoom in": elite_galaxy_release + Key("z:down/5"),
+
+        # Driving
+        #"drive left <n>": Function(elite_timed_key, name="a", factor=6),
+        #"drive right <n>": Function(elite_timed_key, name="d", factor=6),
+        #"drive faster": Function(elite_key, name="e"),
+        #"drive slower": Function(elite_key, name="q"),
+        "drive target [ahead]": Mouse("right:down/5, right:up/10"),
+        "drive fox 1": Mouse("left:down/5, left:up/10"),
+        "drive fire 1": Mouse("left:down/5"),
+        "drive cease fire": Mouse("left:up/10"),
+        "drive lights": Function(elite_key, name="l"),
+        "drive turret": Function(elite_key, name="u"),
+        "drive [weapon] mode": Function(elite_key, name="m"),
+        "drive [next] weapon": Function(elite_key, name="n"),
+        "drive [cargo] scoop": Function(elite_key, name="home"),
+        "drive jump <n>": Function(elite_timed_key, name="space", factor=30),
+
+        # Camera Suite
+        "camera [suite]": Function(elite_long_key, pre="3", name="q"),
+        "next camera": Function(elite_long_key, pre="3", name="w"),
+        "previous camera": Function(elite_long_key, pre="3", name="e"),
+        "free camera": Function(elite_long_key, pre="3", name="r"),
+        "camera one": Function(elite_long_key, pre="3", name="a"),
+        "camera two": Function(elite_long_key, pre="3", name="s"),
+        "camera three": Function(elite_long_key, pre="3", name="d"),
+        "camera four": Function(elite_long_key, pre="3", name="f"),
+        "camera five": Function(elite_long_key, pre="3", name="g"),
+        "camera six": Function(elite_long_key, pre="3", name="h"),
+        "camera seven": Function(elite_long_key, pre="3", name="j"),
+        "camera eight": Function(elite_long_key, pre="3", name="k"),
+        "camera nine": Function(elite_long_key, pre="3", name="l"),
+        "toggle hud": Function(elite_long_key, pre="4", name="q"),
+        "(show|hide) interface": Key("ctrl:down/5, ctrl:up/10"),
+        "increase camera speed": Function(elite_long_key, pre="4", name="w"),
+        "decrease camera speed": Function(elite_long_key, pre="4", name="e"),
 
         # Playlist
         "playlist (play|pause)": Function(elite_long_key, pre="6", name="q"),
@@ -739,6 +909,63 @@ class EliteRule(MappingRule):
         # Full-spectrum system scanner
         "(FSS|scan system|system scanner|full spectrum system scanner)": Function(elite_longer_key, pre="7", name="q"),
 
+        # Ego
+        "alpha": Text("a"),
+        "bravo": Text("b"),
+        "charlie": Text("c"),
+        "delta": Text("d"),
+        "echo": Text("e"),
+        "foxtrot": Text("f"),
+        "golf": Text("g"),
+        "hotel": Text("h"),
+        "(india|indigo)": Text("i"),
+        "juliet": Text("j"),
+        "kilo": Text("k"),
+        "lima": Text("l"),
+        "mike": Text("m"),
+        "november": Text("n"),
+        "oscar": Text("o"),
+        "(Papa|pappa|pepper|popper)": Text("p"),
+        "quebec": Text("q"),
+        "romeo": Text("r"),
+        "sierra": Text("s"),
+        "tango": Text("t"),
+        "uniform": Text("u"),
+        "victor": Text("v"),
+        "whiskey": Text("w"),
+        "x-ray": Text("x"),
+        "yankee": Text("y"),
+        "zulu": Text("z"),
+        "big alpha": Text("A"),
+        "big bravo": Text("B"),
+        "big charlie": Text("C"),
+        "big delta": Text("D"),
+        "big echo": Text("E"),
+        "big foxtrot": Text("F"),
+        "big golf": Text("G"),
+        "big hotel": Text("H"),
+        "big india": Text("I"),
+        "big juliet": Text("J"),
+        "big kilo": Text("K"),
+        "big lima": Text("L"),
+        "big mike": Text("M"),
+        "big november": Text("N"),
+        "big oscar": Text("O"),
+        "big (Papa|pappa|pepper|popper)": Text("P"),
+        "big quebec": Text("Q"),
+        "big romeo": Text("R"),
+        "big sierra": Text("S"),
+        "big tango": Text("T"),
+        "big uniform": Text("U"),
+        "big victor": Text("V"),
+        "big whiskey": Text("W"),
+        "big x-ray": Text("X"),
+        "big yankee": Text("Y"),
+        "big zulu": Text("Z"),
+        "(dash|hyphen|minus)": Text("-"),
+        "space": Text(" "),
+        "strike": Key("backspace"),
+        "strike <n>": Key("backspace:%(n)d"),
     }
     extras = [
         Dictation("text"),
