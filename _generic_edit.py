@@ -46,6 +46,11 @@ from lib.format import (
     FormatTypes as ft,
 )
 
+import json
+import os
+from win32com.client import Dispatch
+from win32com.client.gencache import EnsureDispatch
+
 release = Key("shift:up, ctrl:up, alt:up, win:up")
 
 ################################################################################
@@ -311,6 +316,10 @@ grammarCfg.cmd.map = Item(
         "doc (search|find)": Key("c-f"),
         "doc print": Key("c-p"),
         "doc format": Key("a-e, v, a"),
+        "doc this year": Key("a-d/5, end/5") + Text("&tbs=cdr%%3A1%%2Ccd_min%%3A1+Jan+2019%%2Ccd_max%%3A&tbm=", pause=0.001) + Key("enter"),
+        "zoom in": Key("c-plus, c-plus"),
+        "zoom out": Key("c-minus, c-minus"),
+        "zoom reset": Key("c-0"),
         "select line [<n>]": release + Key("home, home, s-down:%(n)d"),
         "go block start [<n>]": Key("sa-[:%(n)d"),
         "show parameters": Key("cs-space"),
@@ -545,7 +554,7 @@ class RepeatRule(CompoundRule):
                 action.execute()
         release.execute()
 
-elite_context = AppContext(executable="elitedangerous")
+elite_context = AppContext(executable="elitedangerous") | AppContext(executable="showvirtualkeys")
 
 grammar = Grammar("Generic edit", context=~elite_context)
 grammar.add_rule(RepeatRule())  # Add the top-level rule.
@@ -562,6 +571,34 @@ def unload():
 
 elite_mode = "flight"
 elite_driving_speed = 0
+
+elite_speaker = None
+
+def elite_init_speech():
+    global elite_speaker
+    elite_speaker = Dispatch("SAPI.SpVoice")
+    voices = elite_speaker.GetVoices()
+    emma_found = 0
+    for i in range(voices.Count):
+        voice = voices.Item(i)
+        description = voice.GetDescription()
+        if "Emma" in description:
+            elite_speaker.Voice = voice
+            emma_found = 1
+    if not emma_found:
+        print "\"Emma\" voice not found. Available voices:"
+        for i in range(voices.Count):
+            voice = voices.Item(i)
+            description = voice.GetDescription()
+            print str(i) + ": " + description
+        print "---"
+    #elite_speaker.Speak("Testing 1 2 3 4.")
+
+elite_init_speech()
+
+def elite_speak(text):
+    if elite_speaker:
+        elite_speaker.Speak(text)
 
 def elite_key(n=1, name=None):
     k = Key("{}:down/5, {}:up/10".format(name, name))
@@ -589,16 +626,25 @@ def elite_timed_key_pair(n=1, name=None, factor=12, second=None):
 def elite_switch_mode(name):
     global elite_mode
     elite_mode = name
-    get_engine().speak(name + " mode")
+    elite_speak(name + " mode")
 
 def elite_galaxy_map():
     elite_longer_key(pre="f1", name="u")
 
-def elite_next_tab():
-    elite_longer_key(pre="f2", name="i")
+def elite_next_tab(n=1):
+    elite_longer_key(pre="f2", name="i", n=n)
 
-def elite_select():
-    elite_key(name="b")
+def elite_previous_tab(n=1):
+    elite_longer_key(pre="f2", name="h", n=n)
+
+def elite_select(n=1):
+    elite_key(name="space", n=n)
+
+def elite_back(n=1):
+    elite_key(name="backspace", n=n)
+
+def elite_left_panel():
+    elite_key(name="1")
 
 def elite_galaxy_route():
     elite_galaxy_map()
@@ -613,6 +659,34 @@ def elite_galaxy_bookmarks():
     elite_next_tab()
     elite_next_tab()
 
+def elite_go_bookmark(n=0):
+    elite_galaxy_map()
+    sleep(2)
+    elite_next_tab()
+    elite_next_tab()
+    sleep(0.2)
+    for i in range(n):
+        elite_navigate(name="down")
+    sleep(0.2)
+    elite_select()
+    sleep(0.2)
+    elite_select()
+    sleep(0.5)
+    elite_back()
+
+def elite_request_docking():
+    elite_left_panel()
+    sleep(1)
+    elite_next_tab()
+    elite_next_tab()
+    sleep(0.3)
+    elite_navigate(name="right")
+    elite_select()
+    sleep(0.5)
+    elite_previous_tab()
+    elite_previous_tab()
+    elite_back()
+
 def elite_navigate(name=None, n=1):
     global elite_mode
     if name == "left":
@@ -625,6 +699,12 @@ def elite_navigate(name=None, n=1):
             Function(elite_key, name="right", n=n).execute()
         elif elite_mode == "driving":
             Function(elite_timed_key, name="d", factor=6, n=n).execute()
+    elif name == "up":
+        if elite_mode == "flight":
+            Function(elite_key, name="up", n=n).execute()
+    elif name == "down":
+        if elite_mode == "flight":
+            Function(elite_key, name="down", n=n).execute()
 
 def elite_relative_speed(name=None, n=1):
     global elite_mode
@@ -658,13 +738,33 @@ def elite_all_stop():
             elite_driving_speed = elite_driving_speed + 1
             Key("e:down/5, e:up/10").execute()
 
+def elite_impulse(n = None):
+    if n == 100:
+        elite_long_key(pre="f5", name="a")
+    elif n == 75:
+        elite_long_key(pre="f5", name="p")
+    elif n == 50:
+        elite_long_key(pre="f5", name="o")
+    elif n == 25:
+        elite_long_key(pre="f5", name="i")
+    elif n == 0:
+        elite_all_stop()
+    elif n == -25:
+        elite_long_key(pre="f5", name="y")
+    elif n == -50:
+        elite_long_key(pre="f5", name="t")
+    elif n == -75:
+        elite_long_key(pre="f5", name="r")
+    elif n == -100:
+        elite_long_key(pre="f5", name="e")
+
 def elite_what_driving_speed():
-    get_engine().speak("driving speed is {}".format(elite_driving_speed))
+    elite_speak("driving speed is {}".format(elite_driving_speed))
 
 def elite_reset_driving_speed():
     global elite_driving_speed
     elite_driving_speed = 0
-    get_engine().speak("driving speed is now {}".format(elite_driving_speed))
+    elite_speak("driving speed is now {}".format(elite_driving_speed))
 
 def elite_target(name):
     global elite_mode
@@ -677,9 +777,108 @@ def elite_target(name):
 
 def elite_what_mode():
     global elite_mode
-    get_engine().speak(elite_mode + " mode")
+    elite_speak(elite_mode + " mode")
+
+def elite_toggle_lights():
+    elite_long_key(pre="f11", name="q")
+
+def elite_toggle_night_vision():
+    elite_long_key(pre="f11", name="k")
+
+def elite_toggle_silent_running():
+    elite_long_key(pre="f9", name="q")
+
+def elite_cargo_scoop():
+    elite_long_key(pre="f11", name="o")
+
+def elite_toggle_hardpoints():
+    elite_long_key(pre="f8", name="t")
+
+def elite_next_fire_group():
+    elite_long_key(pre="f8", name="e")
+
+def elite_previous_fire_group():
+    elite_long_key(pre="f8", name="r")
+
+def elite_hud_mode():
+    elite_longer_key(pre="f1", name="f")
+
+def elite_toggle_landing_gear():
+    elite_long_key(pre="f11", name="a")
+
+def elite_boost_engines():
+    elite_long_key(pre="f6", name="w")
+
+def elite_supercruise():
+    elite_long_key(pre="f6", name="r")
+
+def elite_load_status():
+    try:
+        with open(os.path.expandvars("%USERPROFILE%\\Saved Games\\Frontier Developments\\Elite Dangerous\\Status.json")) as f:
+            status = json.load(f)
+            return status
+    except Exception, e:
+        elite_speak('Sensor error.')
+        return {
+            'Flags': 0,
+            'FireGroup': 0,
+        }
+
+def elite_stow_everything():
+    flags = elite_load_status()['Flags']
+    if (flags & 512):
+        elite_cargo_scoop()
+    if (flags & 64):
+        elite_toggle_hardpoints()
+    if (flags & 256):
+        elite_toggle_lights()
+    if (flags & 1024):
+        elite_toggle_silent_running()
+    if (flags & 268435456):
+        elite_toggle_night_vision()
+    if (flags & 4):
+        elite_toggle_landing_gear()
+    if (flags & 134217728):
+        # analysis mode
+        pass
+
+def elite_deploy_weapon_group(g = 0, deploy = None, mode = None):
+    status = elite_load_status()
+    flags = status['Flags']
+
+    if ((flags & 64) == 0 and deploy == "deploy"):
+        elite_toggle_hardpoints()
+    if ((flags & 64) != 0 and deploy == "retract"):
+        elite_toggle_hardpoints()
+
+    if ((flags & 134217728) != 0 and mode == "combat"):
+        elite_hud_mode()
+    if ((flags & 134217728) == 0 and mode == "analysis"):
+        elite_hud_mode()
+
+    group = status['FireGroup']
+    while group > g:
+        elite_previous_fire_group()
+        group = group - 1
+    while group < g:
+        elite_next_fire_group()
+        group = group + 1
+
+def elite_gtfo(response = None):
+    elite_stow_everything()
+    elite_impulse(100)
+    elite_boost_engines()
+    elite_supercruise()
+    if response == "flock":
+        elite_speak("Let's get the flock out of here.")
+    elif response == "gtfo":
+        elite_speak("Acknowledged. Getting out of here, Commander.")
+    else:
+        elite_speak("Exit protocol.")
 
 elite_galaxy_release = Key("w:up, a:up, s:up, r:up, x:up, z:up, f:up, d:up/10")
+
+elite_mouse_wake = "<3,3>/10, [0.95, 0.87]"
 
 class EliteRule(MappingRule):
     mapping = {
@@ -694,19 +893,19 @@ class EliteRule(MappingRule):
         "reset mouse": Function(elite_long_key, pre="9", name="q"),
 
         # Flight rotation
-        "sky <n>": Function(elite_timed_key, name="b"),
+        "sky <n>": Function(elite_timed_key, name="np8"),
         "sea <n>": Function(elite_timed_key, name="np5"),
         "loll <n>": Function(elite_timed_key, name="np4", factor=3),
         "roll <n>": Function(elite_timed_key, name="np6", factor=3),
-        "port <n>": Function(elite_timed_key, name="a"),
-        "starboard <n>": Function(elite_timed_key, name="c"),
-        "sky": Key("np5:up/10, b:down/5"),
-        "sea": Key("b:up/10, np5:down/5"),
+        "port <n>": Function(elite_timed_key, name="np7"),
+        "starboard <n>": Function(elite_timed_key, name="np9"),
+        "sky": Key("np5:up/10, np8:down/5"),
+        "sea": Key("np8:up/10, np5:down/5"),
         "loll": Key("np6:up/10, np4:down/5"),
         "roll": Key("np4:up/10, np6:down/5"),
-        "port": Key("c:up/10, a:down/5"),
-        "starboard": Key("a:up/10, c:down/5"),
-        "lock": Key("np4, np5, np6, np7, np8, np9, a, b, c, np4:up, np5:up, np6:up, np7:up, np8:up, np9:up, a:up, b:up, c:up/10"),
+        "port": Key("np9:up/10, np7:down/5"),
+        "starboard": Key("np7:up/10, np9:down/5"),
+        "lock": Key("np4, np5, np6, np7, np8, np9, np4:up, np5:up, np6:up, np7:up, np8:up, np9:up/10"),
 
         # Flight thrust
         "thrust up": Key("f:up/10, r:down/5"),
@@ -726,20 +925,20 @@ class EliteRule(MappingRule):
         # Flight throttle
         "faster [<n>]": Function(elite_relative_speed, name="faster"),
         "slower [<n>]": Function(elite_relative_speed, name="slower"),
-        "full reverse": Function(elite_long_key, pre="f5", name="e"),
-        "three quarter reverse": Function(elite_long_key, pre="f5", name="r"),
-        "half reverse": Function(elite_long_key, pre="f5", name="t"),
-        "quarter reverse": Function(elite_long_key, pre="f5", name="y"),
-        "all stop": Function(elite_all_stop),
-        "quarter impulse": Function(elite_long_key, pre="f5", name="i"),
-        "half impulse": Function(elite_long_key, pre="f5", name="o"),
+        "full reverse": Function(elite_impulse, n=-100),
+        "three quarter reverse": Function(elite_impulse, n=-75),
+        "half reverse": Function(elite_impulse, n=-50),
+        "quarter reverse": Function(elite_impulse, n=-25),
+        "all stop": Function(elite_impulse, n=0),
+        "quarter impulse": Function(elite_impulse, n=25),
+        "half impulse": Function(elite_impulse, n=50),
         "(three quarter impulse|cruising speed)": Function(elite_long_key, pre="f5", name="p"),
-        "(full impulse|engage|[all] ahead full)": Function(elite_long_key, pre="f5", name="a"),
+        "(full impulse|engage|[all] ahead full)": Function(elite_impulse, n=100),
 
         # Flight miscellaneous
-        "boost [engines]": Function(elite_long_key, pre="f6", name="w"),
+        "boost [engines]": Function(elite_boost_engines),
         "[charge the] hyperdrive": Function(elite_long_key, pre="f6", name="e"),
-        "(supercruise|cruise)": Function(elite_long_key, pre="f6", name="r"),
+        "(supercruise|cruise)": Function(elite_supercruise),
         "(hyperspace|jump)": Function(elite_long_key, pre="f6", name="t"),
         "toggle orbit lines": Function(elite_long_key, pre="f6", name="y"),
 
@@ -768,16 +967,23 @@ class EliteRule(MappingRule):
         "fox 1": Mouse("left:down/5, left:up/10"),
         "fox 2": Mouse("right:down/5, right:up/10"),
         "fox 3": Mouse("middle:down/5, middle:up/10"),
-        "(next fire group|next weapon|weapon) [<n>]": Function(elite_long_key, pre="f8", name="e"),
-        "(previous fire group|previous weapon) [<n>]": Function(elite_long_key, pre="f8", name="r"),
-        "(deploy|retract|stow) (hardpoints|weapons)": Function(elite_long_key, pre="f8", name="t"),
+        "(next fire group|next weapon) [<n>]": Function(elite_next_fire_group),
+        "(previous fire group|previous weapon) [<n>]": Function(elite_previous_fire_group),
+        "[deploy|retract] hardpoints": Function(elite_toggle_hardpoints),
+        "(deploy|retract) weapons": Function(elite_toggle_hardpoints),
+        "weapons": Function(elite_deploy_weapon_group, g=0, deploy="deploy", mode="combat"),
+        "[kill] warrant scanner|collector|collector limpets|collector limpet|limpet|limpets": Function(elite_deploy_weapon_group, g=1, deploy="deploy", mode="combat"),
+        "wake scanner|interdictor": Function(elite_deploy_weapon_group, g=2, deploy=None, mode="combat"),
+        "scanner": Function(elite_deploy_weapon_group, g=3, deploy="retract", mode="analysis"),
+        "as the shepherd said to the shepherdess": Function(elite_gtfo, response="flock"),
+        "GTFO": Function(elite_gtfo, response="gtfo"),
 
         # Cooling
-        "(silent running|run silent)": Function(elite_long_key, pre="f9", name="q"),
+        "(silent running|run silent)": Function(elite_toggle_silent_running),
         "(use|deploy|launch|fire) heatsink": Function(elite_long_key, pre="f9", name="w"),
 
         # Miscellaneous
-        "[toggle] [ship] lights": Function(elite_long_key, pre="f11", name="q"),
+        "[toggle] [ship] lights": Function(elite_toggle_lights),
         "[increase] sensor zoom [in]": Function(elite_long_key, pre="f11", name="w"),
         "[decrease] sensor zoom [out]": Function(elite_long_key, pre="f11", name="e"),
         "power to engines": Key("alt:down/5, f11:down/5, u:down/5, u:up/10, u:down/5, u:up/10, r:down/5, r:up/10, r:down/5, r:up/10, r:down/5, r:up/10, f11:up/10, alt:up/10"),
@@ -786,31 +992,34 @@ class EliteRule(MappingRule):
         "power to (shields and engines|engines and shields)": Key("alt:down/5, f11:down/5, u:down/5, u:up/10, y:down/5, y:up/10, r:down/5, r:up/10, y:down/5, y:up/10, r:down/5, r:up/10, f11:up/10, alt:up/10"),
         "balance power": Function(elite_long_key, pre="f11", name="u"),
         "reset HMD": Function(elite_long_key, pre="f11", name="i"),
-        "cargo scoop": Function(elite_long_key, pre="f11", name="o"),
+        "cargo scoop": Function(elite_cargo_scoop),
         "jettison all cargo": Function(elite_long_key, pre="f11", name="p"),
-        "landing gear": Function(elite_long_key, pre="f11", name="a"),
+        "landing gear": Function(elite_toggle_landing_gear),
         "(use|deploy|launch|fire) shield cell": Function(elite_long_key, pre="f11", name="d"),
         "(use|deploy|launch|fire) (chaff|chef|chav) [launcher]": Function(elite_long_key, pre="f11", name="f"),
         "charge (ECM|countermeasures)": Function(elite_long_key, pre="f11", name="g"),
         "weapon colour": Function(elite_long_key, pre="f11", name="h"),
         "engine colour": Function(elite_long_key, pre="f11", name="j"),
-        "night vision": Function(elite_long_key, pre="f11", name="k"),
+        "night vision": Function(elite_toggle_night_vision),
 
         # Mode switches
-        "(left panel|target panel|Nav)": Function(elite_key, name="1"),
+        "(left panel|target panel|Nav)": Function(elite_left_panel),
         "(right panel|systems|inventory|ship)": Function(elite_key, name="4"),
         "(top panel|comms)": Function(elite_key, name="2"),
         "(bottom panel|role panel)": Function(elite_key, name="3"),
         "galaxy map": Function(elite_galaxy_map),
-        "galaxy route": Function(elite_galaxy_route),
+        "galaxy (route|search)": Function(elite_galaxy_route),
         "galaxy (bookmarks|bookmark)": Function(elite_galaxy_bookmarks),
+        "(set|plot) course (to|for) sirius": Function(elite_go_bookmark, n=0),
+        "(set|plot) course (to|for) robigo": Function(elite_go_bookmark, n=1),
         "system map": Function(elite_longer_key, pre="f1", name="i"),
         "show CQC score screen": Function(elite_longer_key, pre="f1", name="o"),
         "headlook": Function(elite_longer_key, pre="f1", name="p"),
         "game menu": Function(elite_longer_key, pre="f1", name="a"),
         "open discovery": Function(elite_longer_key, pre="f1", name="d"),
-        "[switch|change] [hud|hut|hudd|weapon] mode": Function(elite_longer_key, pre="f1", name="f"),
-        "request docking": Key("1:down/5, 1:up/50, e:down/5, e:up/50, e:down/5, e:up/50, right:down/5, right:up/50, space:down/5, space:up/50, left:down/5, left:up/50, q:down/5, q:up/50, q:down/5, q:up/50, backspace:down/5, backspace:up/50"),
+        "[switch|change] [hud|hut|hudd|weapon] mode": Function(elite_hud_mode),
+        "request docking": Function(elite_request_docking),
+        "doors to automatic|stow everything": Function(elite_stow_everything),
 
         # Interface mode
         "up [<n>]": Function(elite_key, name="up"),
@@ -820,12 +1029,16 @@ class EliteRule(MappingRule):
         "slap [<n>]": Function(elite_key, name="enter"),
         "quit [<n>]": Function(elite_key, name="escape"),
         "(space|go|select|make it so) [<n>]": Function(elite_select),
-        "back [<n>]": Function(elite_key, name="backspace"),
+        "back [<n>]": Function(elite_back),
         "expand|collapse": Function(elite_longer_key, pre="f2", name="u"),
         "[next] tab [<n>]": Function(elite_next_tab),
-        "(previous tab|shift tab|bat) [<n>]": Function(elite_longer_key, pre="f2", name="h"),
+        "(previous tab|shift tab|bat) [<n>]": Function(elite_previous_tab),
         "next page [<n>]": Function(elite_longer_key, pre="f2", name="j"),
         "previous page [<n>]": Function(elite_longer_key, pre="f2", name="k"),
+        "scroll down": Mouse(elite_mouse_wake + ", wheeldown:3"),
+        "scroll up": Mouse(elite_mouse_wake + ", wheelup:3"),
+        "scroll top": Mouse(elite_mouse_wake + ", wheelup:30"),
+        "(scroll bottom|rewards|passengers)": Mouse(elite_mouse_wake + ", wheeldown:30"),
 
         "(meta down|alt key down)": Key("alt:down/5"),
         "(meta up|alt key up)": Key("alt:up/10"),
@@ -908,6 +1121,10 @@ class EliteRule(MappingRule):
 
         # Full-spectrum system scanner
         "(FSS|scan system|system scanner|full spectrum system scanner)": Function(elite_longer_key, pre="7", name="q"),
+
+        # Ego
+        "(auto pilot|robot)": Function(elite_key, name="f16"),
+        "toggle fullscreen": Key("alt:down, enter:down/5, enter:up, alt:up/10"),
 
         # Ego
         "alpha": Text("a"),
